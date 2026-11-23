@@ -1,180 +1,184 @@
-//Variables
-const searchbar = document.querySelector(".searchbar-container");
-const profilecontainer = document.querySelector(".profile-container");
-const root = document.documentElement.style;
-const get = (param) => document.getElementById(`${param}`);
-const url = "https://api.github.com/users/";
-const noresults = get("no-results");
-const btnmode = get("btn-mode");
-const modetext = get("mode-text");
-const modeicon = get("mode-icon");
-const btnsubmit = get("submit");
+const get = (id) => document.getElementById(id);
+const apiUrl = "https://api.github.com/users/";
+const searchForm = get("search-form");
 const input = get("input");
-const avatar = get("avatar");
-const userName = get("name");
-const user = get("user");
-const date = get("date");
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const bio = get("bio");
-const repos = get("repos");
-const followers = get("followers");
-const following = get("following");
-const user_location = get("location");  
-const page = get("page");
-const twitter = get("twitter");
-const company = get("company");
-let darkMode = false;
+const searchStatus = get("search-status");
+const profile = get("profile");
+const repositoriesStatus = get("repositories-status");
+const repositoryList = get("repository-list");
+const copyStatus = get("copy-status");
+const themeButton = get("btn-mode");
+const root = document.documentElement.style;
+let currentRequest;
+let currentProfileUrl = "";
 
-// Event Listeners
-btnsubmit.addEventListener("click", function () {
-  if (input.value !== "") {
-    getUserData(url + input.value);
-  }
-});
-
-input.addEventListener(
-  "keydown",
-  function (e) {
-    if (e.key == "Enter") {
-      if (input.value !== "") {
-        getUserData(url + input.value);
-      }
-    }
-  },
-  false
-);
-
-input.addEventListener("input", function () {
-  noresults.style.display = "none";
-});
-
-btnmode.addEventListener("click", function () {
-  if (darkMode == false) {
-    darkModeProperties();
-  } else {
-    lightModeProperties();
-  }
-});
-
-// Functions
-
-//API CALL
-function getUserData(gitUrl) {
-  fetch(gitUrl)
-    .then((response) => response.json())
-    .then((data) => {
-      console.log(data);
-      updateProfile(data);
-    })
-    .catch((error) => {
-      throw error;
-    });
+function setTheme(dark) {
+  root.setProperty("--lm-bg", dark ? "#141D2F" : "#F6F8FF");
+  root.setProperty("--lm-bg-content", dark ? "#1E2A47" : "#FEFEFE");
+  root.setProperty("--lm-text", dark ? "white" : "#4B6A9B");
+  root.setProperty("--lm-text-alt", dark ? "white" : "#2B3442");
+  root.setProperty("--link-color", dark ? "#8dc4ff" : "#005fcc");
+  root.setProperty("--lm-icon-bg", dark ? "brightness(1000%)" : "brightness(100%)");
+  get("mode-text").textContent = dark ? "LIGHT" : "DARK";
+  get("mode-icon").src = dark ? "./assets/images/sun-icon.svg" : "./assets/images/moon-icon.svg";
+  themeButton.setAttribute("aria-pressed", String(dark));
+  localStorage.setItem("dark-mode", String(dark));
 }
 
+themeButton.addEventListener("click", () => {
+  setTheme(themeButton.getAttribute("aria-pressed") !== "true");
+});
 
-//RENDER
+function apiError(response) {
+  if (response.status === 404) return "No GitHub user found with that username.";
+  if (response.status === 429 || (response.status === 403 && response.headers.get("x-ratelimit-remaining") === "0")) {
+    return "GitHub's API rate limit was reached. Please try again later.";
+  }
+  return `GitHub returned an error (${response.status}). Please try again.`;
+}
+
+async function fetchJson(url, signal) {
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(apiError(response));
+  return response.json();
+}
+
+function setDetail(id, value) {
+  const element = get(id);
+  const available = Boolean(value);
+  element.textContent = value || "Not Available";
+  element.style.opacity = available ? "1" : "0.5";
+  element.previousElementSibling.style.opacity = available ? "1" : "0.5";
+}
+
+function websiteUrl(value) {
+  if (!value) return null;
+  try {
+    const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(value) ? value : `https://${value}`);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function updateProfile(data) {
-  if (data.message !== "Not Found") {
-    noresults.style.display = "none";
-    function checkNull(param1, param2) {
-      if (param1 === "" || param1 === null) {
-        param2.style.opacity = 0.5;
-        param2.previousElementSibling.style.opacity = 0.5;
-        return false;
-      } else {
-        return true;
-      }
+  currentProfileUrl = `https://github.com/${encodeURIComponent(data.login)}`;
+  get("avatar").src = data.avatar_url;
+  get("avatar").alt = `${data.login}'s avatar`;
+  get("name").textContent = data.name || data.login;
+  get("user").textContent = `@${data.login}`;
+  get("user").href = currentProfileUrl;
+  const joined = new Date(data.created_at);
+  get("date").textContent = `Joined ${joined.toLocaleDateString("en-GB", {
+    day: "2-digit", month: "short", year: "numeric", timeZone: "UTC",
+  })}`;
+  get("bio").textContent = data.bio || "This profile has no bio";
+  get("repos").textContent = data.public_repos;
+  get("followers").textContent = data.followers;
+  get("following").textContent = data.following;
+  setDetail("location", data.location);
+  const website = websiteUrl(data.blog);
+  setDetail("page", data.blog);
+  if (website) get("page").href = website;
+  else get("page").removeAttribute("href");
+  setDetail("twitter", data.twitter_username);
+  if (data.twitter_username) get("twitter").href = `https://twitter.com/${encodeURIComponent(data.twitter_username)}`;
+  else get("twitter").removeAttribute("href");
+  setDetail("company", data.company);
+  copyStatus.textContent = "";
+  profile.hidden = false;
+}
+
+function renderRepositories(repositories, login) {
+  repositoryList.replaceChildren();
+  if (repositories.length === 0) {
+    repositoriesStatus.textContent = "No public repositories found.";
+    return;
+  }
+  repositoriesStatus.textContent = "";
+  repositories.forEach((repository) => {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = `https://github.com/${encodeURIComponent(login)}/${encodeURIComponent(repository.name)}`;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = repository.name;
+    item.append(link);
+    if (repository.description) {
+      const description = document.createElement("p");
+      description.textContent = repository.description;
+      item.append(description);
     }
-    avatar.src = `${data.avatar_url}`;
-    userName.innerText = data.name === null ? data.login : data.name;
-    user.innerText = `@${data.login}`;
-    user.href = `${data.html_url}`;
-    datesegments = data.created_at.split("T").shift().split("-");
-    date.innerText = `Joined ${datesegments[2]} ${months[datesegments[1] - 1]} ${datesegments[0]}`;
-    bio.innerText = data.bio == null ? "This profile has no bio" : `${data.bio}`;
-    repos.innerText = `${data.public_repos}`;
-    followers.innerText = `${data.followers}`;
-    following.innerText = `${data.following}`;
-    user_location.innerText = checkNull(data.location, user_location) ? data.location : "Not Available";
-    page.innerText = checkNull(data.blog, page) ? data.blog : "Not Available";
-    page.href = checkNull(data.blog, page) ? data.blog : "#";
-    twitter.innerText = checkNull(data.twitter_username, twitter) ? data.twitter_username : "Not Available";
-    twitter.href = checkNull(data.twitter_username, twitter) ? `https://twitter.com/${data.twitter_username}` : "#";
-    company.innerText = checkNull(data.company, company) ? data.company : "Not Available";
-    searchbar.classList.toggle("active");
-    profilecontainer.classList.toggle("active");
-  } else {
-    noresults.style.display = "block";
+    const details = document.createElement("span");
+    details.className = "repository-details";
+    details.textContent = [repository.language, `${repository.stargazers_count} stars`].filter(Boolean).join(" · ");
+    item.append(details);
+    repositoryList.append(item);
+  });
+}
+
+async function search(username) {
+  if (currentRequest) {
+    currentRequest.abort();
+    if (repositoriesStatus.textContent === "Loading repositories...") {
+      repositoriesStatus.textContent = "Repository loading was interrupted. Search again to retry.";
+    }
+  }
+  const controller = new AbortController();
+  currentRequest = controller;
+  const name = username.trim();
+  if (!/^(?=.{1,39}$)[a-z\d]+(?:-[a-z\d]+)*$/i.test(name)) {
+    searchForm.removeAttribute("aria-busy");
+    searchStatus.textContent = "Enter a valid GitHub username.";
+    return;
+  }
+
+  searchForm.setAttribute("aria-busy", "true");
+  searchStatus.textContent = "Searching GitHub...";
+  try {
+    const data = await fetchJson(`${apiUrl}${encodeURIComponent(name)}`, controller.signal);
+    if (controller.signal.aborted) return;
+    updateProfile(data);
+    searchStatus.textContent = `Showing profile for @${data.login}.`;
+    repositoryList.replaceChildren();
+    repositoriesStatus.textContent = "Loading repositories...";
+    try {
+      const repositories = await fetchJson(
+        `${apiUrl}${encodeURIComponent(data.login)}/repos?sort=updated&per_page=5`,
+        controller.signal
+      );
+      if (!controller.signal.aborted) renderRepositories(repositories, data.login);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      console.error("Unable to load repositories:", error);
+      repositoriesStatus.textContent = `Unable to load repositories. ${error.message}`;
+    }
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    console.error("Unable to load profile:", error);
+    searchStatus.textContent = error instanceof TypeError
+      ? "Unable to reach GitHub. Check your connection and try again."
+      : error.message;
+  } finally {
+    if (currentRequest === controller) searchForm.removeAttribute("aria-busy");
   }
 }
 
+searchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  search(input.value);
+});
 
-
-//SWITCH TO DARK MODE - activateDarkMode()
-function darkModeProperties() {
-  root.setProperty("--lm-bg", "#141D2F");
-  root.setProperty("--lm-bg-content", "#1E2A47");
-  root.setProperty("--lm-text", "white");
-  root.setProperty("--lm-text-alt", "white");
-  root.setProperty("--lm-shadow-xl", "rgba(70,88,109,0.15)");
-  modetext.innerText = "LIGHT";
-  modeicon.src = "./assets/images/sun-icon.svg";
-  root.setProperty("--lm-icon-bg", "brightness(1000%)");
-  darkMode = true;
-  console.log("darkmode changed to " + darkMode);
-  localStorage.setItem("dark-mode", true);
-
-  console.log("setting dark mode to true");
-
-}
-
-//SWITCH TO LIGHT MODE - activateLightMode() 
-function lightModeProperties() {
-  root.setProperty("--lm-bg", "#F6F8FF");
-  root.setProperty("--lm-bg-content", "#FEFEFE");
-  root.setProperty("--lm-text", "#4B6A9B");
-  root.setProperty("--lm-text-alt", "#2B3442");
-  root.setProperty("--lm-shadow-xl", "rgba(70, 88, 109, 0.25)");
-  modetext.innerText = "DARK";
-  modeicon.src = "./assets/images/moon-icon.svg";
-  root.setProperty("--lm-icon-bg", "brightness(100%)");
-  darkMode = false;
-  console.log("darkmode changed to " + darkMode);
-
-  localStorage.setItem("dark-mode", false);
-  console.log("setting dark mode to false");
-}
-
-
-//INITIALISE UI
-function init() {
-  //initialise dark-mode variable to false;
-  //darkMode = true -> dark mode enable karna h 
-  //darMode = false -> light mode enable karna h 
-  darkMode = false;
-
-  //HW
-// const prefersDarkMode = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-  const value = localStorage.getItem("dark-mode");
-
-  if(value === null) {
-    console.log("null k andar");
-    localStorage.setItem("dark-mode", darkMode);
-    lightModeProperties();
+get("copy-profile").addEventListener("click", async () => {
+  try {
+    if (!navigator.clipboard) throw new Error("Clipboard access is unavailable in this browser.");
+    await navigator.clipboard.writeText(currentProfileUrl);
+    copyStatus.textContent = "Profile link copied.";
+  } catch (error) {
+    console.error("Unable to copy profile link:", error);
+    copyStatus.textContent = "Unable to copy. You can copy the profile link above.";
   }
-  else if(value == "true") {
-    console.log("truer k andar");
-    darkModeProperties();
-  }
-  else if(value == "false") {
-    console.log("false k andar");
-    lightModeProperties();
-  }
+});
 
-
-  
-  getUserData(url + "Crusader201  ");
-}
-
-init();
+setTheme(localStorage.getItem("dark-mode") === "true");
+search("Crusader201");

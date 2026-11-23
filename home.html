@@ -23,24 +23,22 @@
 
         <header class="header">
             <h1 class="title">Git-Detective &#128187; </h1>
-            <div id="btn-mode">
-                <p id="mode-text">DARK</p>
-                <div class="icon-container"><img id="mode-icon" src="./assets/images/moon-icon.svg" alt=""></div>
-            </div>
+            <button type="button" id="btn-mode" aria-label="Dark mode" aria-pressed="false">
+                <span id="mode-text">DARK</span>
+                <span class="icon-container"><img id="mode-icon" src="./assets/images/moon-icon.svg" alt=""></span>
+            </button>
         </header>
 
         <main>
             <div id="app">
 
-                <div class="searchbar-container active">
-                    <input type="search" name="user-input" id="input" placeholder="Enter a GitHub username..." required>
-                    <div class="error">
-                        <p id="no-results">no search results</p>
-                    </div>
-                    <button class="btn-search" id="submit">Search</button>
-                </div>
+                <form class="searchbar-container" id="search-form">
+                    <input type="search" name="user-input" id="input" aria-label="GitHub username" placeholder="Enter a GitHub username..." autocomplete="off">
+                    <button class="btn-search" id="submit" type="submit">Search</button>
+                </form>
+                <p id="search-status" class="status" role="status" aria-live="polite"></p>
 
-                <div class="profile-container">
+                <div class="profile-container" id="profile" hidden>
                     <div class="profile-content">
                         <div class="profile-header">
                             <img id="avatar" src="#" alt="">
@@ -48,6 +46,8 @@
                                 <div class="profile-name">
                                     <h2 id="name"></h2>
                                     <a href="#" target="_blank" rel="noopener noreferrer" id="user"></a>
+                                    <button type="button" id="copy-profile" class="btn-secondary">Copy profile link</button>
+                                    <span id="copy-status" class="status" role="status" aria-live="polite"></span>
                                 </div>
                                 <p id="date"></p>
                             </div>
@@ -88,6 +88,12 @@
                                 <p id="company"></p>
                             </div>
                         </div>
+
+                        <section class="repositories" aria-labelledby="repositories-heading">
+                            <h3 id="repositories-heading">Recently updated repositories</h3>
+                            <p id="repositories-status" class="status" role="status" aria-live="polite"></p>
+                            <ul id="repository-list" class="repository-list"></ul>
+                        </section>
 
                     </div>
                 </div>
