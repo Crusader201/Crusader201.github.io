@@ -15,12 +15,13 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: "Lucida Consoloe","Brush Script MT",monospace;
+    font-family: "Poppins", "Segoe UI", sans-serif;
   }
   
   body {
     background-color: var(--lm-bg);
     font-size: 13px;
+    line-height: 1.5;
     color: var(--lm-text);
     width: 100%;
     position: relative;
@@ -50,13 +51,21 @@
     justify-content: space-between;
     align-items: center;
   }
+
+  .title,
+  .profile-name h2,
+  .stat-value {
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 1.2;
+  }
   
   #btn-mode {
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 90px;
-    letter-spacing: 2.5px;
+    letter-spacing: 0.13em;
     color: var(--lm-text);
     font-weight: bold;
   }
@@ -93,7 +102,7 @@
   
   #input::placeholder {
     color: var(--lm-text);
-    letter-spacing: -0.5px;
+    letter-spacing: normal;
     font-size: 13px;
   }
   
